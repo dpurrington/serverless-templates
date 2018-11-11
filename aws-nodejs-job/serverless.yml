@@ -1,0 +1,15 @@
+# Set this to the name of your service
+service: your-servicename-here
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  environment:
+    FOO: ${env:FOO}   # this is how you should pull in environment variables
+    APP_TOKEN: ${env:APP_TOKEN}
+
+functions:
+  job:
+    handler: src/job.doWork
+    events:
+      - schedule: rate(1 day)

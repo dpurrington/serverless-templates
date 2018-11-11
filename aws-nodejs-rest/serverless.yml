@@ -1,0 +1,58 @@
+# Set this to the name of your service
+service: your-servicename-here
+
+plugins:
+  - serverless-pseudo-parameters
+
+custom:
+  <<: &authorizer # This can be repetitive if you have many functions, so use the YAML "anchor" feature.
+    arn: ${env:AUTHORIZER_ARN}
+    identityValidationExpression: ^Bearer +[-0-9a-zA-Z\._]*$
+provider:
+  name: aws
+  runtime: nodejs8.10
+  environment:
+    FOO: ${env:FOO} # this is how you should pull in each enviornment variable
+    API_ROOT:
+      Fn::Join:
+        - ""
+        - - "https://"
+          - Ref: "ApiGatewayRestApi"
+          - ".execute-api.#{AWS::Region}.amazonaws.com/${opt:stage}"
+
+functions:
+  service-handler:
+    handler: src/server.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: any
+          authorizer: *authorizer
+      - http:
+          path: /healthcheck
+          method: GET
+      - http:
+          path: /swagger.json
+          method: GET
+      - http:
+          path: /swagger-ui/
+          method: GET
+      - http:
+          path: /swagger-ui/{proxy+}
+          method: GET
+
+resources:
+  Resources:
+    AuthFailureGatewayResponse:
+      Type: AWS::ApiGateway::GatewayResponse
+      Properties:
+        StatusCode: '401'
+        ResponseType: UNAUTHORIZED
+        ResponseTemplates:
+          application/json: >
+            {"message":$context.error.messageString}
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Expose-Headers: "'WWW-Authenticate,Link'"
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
